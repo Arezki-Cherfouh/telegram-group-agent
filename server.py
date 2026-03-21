@@ -1024,15 +1024,56 @@ async def on_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     log.info("TEXT  | %-22s | len=%d", sender, len(text))
     await _dispatch(sender, text, "text", "", None, None, None)
 
+# async def on_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+#     if not _in_group(update): return
+#     if update.effective_user and update.effective_user.is_bot: return  # ignore bot's own messages
+#     msg     = update.message
+#     sender  = await _sender(update)
+#     caption = msg.caption or ""
+#     ab, af, am, mt = await _download_media(msg)
+#     log.info("MEDIA | %-22s | %-10s | %s | %s", sender, mt, af or "—",
+#              f"{len(ab):,}B" if ab else "N/A")
+#     await _dispatch(sender, "", mt, caption, ab, af, am)
+
 async def on_media(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not _in_group(update): return
-    if update.effective_user and update.effective_user.is_bot: return  # ignore bot's own messages
+    if update.effective_user and update.effective_user.is_bot: return
+
     msg     = update.message
     sender  = await _sender(update)
     caption = msg.caption or ""
+
     ab, af, am, mt = await _download_media(msg)
     log.info("MEDIA | %-22s | %-10s | %s | %s", sender, mt, af or "—",
              f"{len(ab):,}B" if ab else "N/A")
+
+    # Forward media to your private chat using file_id (no re-upload needed)
+    try:
+        if msg.photo:
+            await context.bot.send_photo(PRIVATE_ID, photo=msg.photo[-1].file_id,
+                                          caption=f"📷 *{sender}*: {caption}" if caption else f"📷 *{sender}*",
+                                          parse_mode="Markdown")
+        elif msg.document:
+            await context.bot.send_document(PRIVATE_ID, document=msg.document.file_id,
+                                             caption=f"📄 *{sender}*: {caption}" if caption else f"📄 *{sender}*",
+                                             parse_mode="Markdown")
+        elif msg.voice:
+            await context.bot.send_voice(PRIVATE_ID, voice=msg.voice.file_id,
+                                          caption=f"🎙️ *{sender}*" , parse_mode="Markdown")
+        elif msg.audio:
+            await context.bot.send_audio(PRIVATE_ID, audio=msg.audio.file_id,
+                                          caption=f"🎵 *{sender}*: {caption}" if caption else f"🎵 *{sender}*",
+                                          parse_mode="Markdown")
+        elif msg.video:
+            await context.bot.send_video(PRIVATE_ID, video=msg.video.file_id,
+                                          caption=f"🎬 *{sender}*: {caption}" if caption else f"🎬 *{sender}*",
+                                          parse_mode="Markdown")
+        elif msg.sticker:
+            await context.bot.send_sticker(PRIVATE_ID, sticker=msg.sticker.file_id)
+    except Exception as exc:
+        log.error("Failed to forward media to private chat: %s", exc)
+
+    # Email + LangGraph classification — unchanged
     await _dispatch(sender, "", mt, caption, ab, af, am)
 
 # =============================================================================
